@@ -1,0 +1,84 @@
+org: ahmedmahmoud
+app: myapp
+service: serverlessjams
+
+frameworkVersion: '2'
+
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-east-1
+  lambdaHashingVersion: 20201221
+  
+  environment:
+    DYNAMODB_TABLE: serverlessjams-voteCounts
+    AUTH0_DOMAIN: dev-noeoek97.us.auth0.com
+    AUTH0_API_ID: lkdlj9ctgb
+  #gives our functions persmissions to act inside the dynamodb table
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "dynamodb: Scan"
+        - "dynamodb: UpdateItem"
+        - "dynamodb: PutItem"
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+      #table => means what sort of resource this is
+      #after slash / gives the name of the table inside the dynamodb
+
+functions:
+  auth:
+    handler: backend/auth.handler
+  recordSongVote:
+    handler: backend/record_song_vote.handler #name_of_file.name_of_function
+    events:
+      - http:
+          path: song/vote
+          method: post
+          authorizer: 
+            name: auth
+          cors: true
+  getSongVoteCounts:
+    handler: backend/get_song_vote_counts.handler
+    events:
+      - http:
+          path: votes
+          method: get
+          cors: true
+#resources sections allow us to create cloud formation specific resources
+resources:
+  Resources:
+    songsTable: #name of new cloudformation resource
+      #to specify the type of aws resource 
+      Type: AWS::DynamoDB::Table #which tell us we are creating dynamodb table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
+        AttributeDefinitions: #to define your attributes in the table here
+          - AttributeName: songName
+            AttributeType: S
+        KeySchema: #for primary key use the defined attribute called songName as a PK
+          - AttributeName: songName
+            KeyType: HASH
+        ProvisionedThroughput: #control your throughput to be cheap as possible
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+                                 
+
+  #Outputs: help you manage cloud formation outputs
+plugins:
+  - serverless-finch
+  - serverless-python-requirements
+
+custom:
+  client:
+    bucketName: ahmedtest-s3-klmnopqrstuvwxyz2211
+    distributionFolder: frontend
+    errorDocument: index.html
+  pythonRequirements:
+    dockerizePip: non-linux
+
+package:
+  exclude:
+    - node_modules/**
+    - frontend/**
+    - package-lock.json
