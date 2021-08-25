@@ -2,9 +2,12 @@ import boto3
 import os
 import json
 
-dynamodb = boto3.client('dynamodb');
+from scope_check import scope_check
+
+dynamodb = boto3.client('dynamodb')
 
 def handler(event, context):
+    scope_check(event, required_scopes='write:votes')
     song_name = json.loads(event['body'])['songName'];
     result = dynamodb.update_item(
         TableName = os.environ['DYNAMODB_TABLE'], #Must specify the tablename you are interacting with
